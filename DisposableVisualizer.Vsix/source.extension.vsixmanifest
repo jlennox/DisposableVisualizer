@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+    <Metadata>
+        <Identity Id="DisposableVisualizer..0c3808ff-5e23-46c2-89e2-3a790606d5f7" Version="1.0" Language="en-US" Publisher="joe"/>
+        <DisplayName>DisposableVisualizer</DisplayName>
+        <Description xml:space="preserve">Underlines creation of disposable classes inside Visual Studio.Underlines creation of disposable classes inside Visual Studio.</Description>
+    </Metadata>
+    <Installation>
+        <InstallationTarget Version="[14.0,]" Id="Microsoft.VisualStudio.Pro" />
+    </Installation>
+    <Dependencies>
+        <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.5,)" />
+    </Dependencies>
+    <Assets>
+        <Asset Type="Microsoft.VisualStudio.MefComponent" d:Source="Project" d:ProjectName="DisposableVisualizer" Path="|DisposableVisualizer|"/>
+        <Asset Type="Microsoft.VisualStudio.Analyzer" d:Source="Project" d:ProjectName="DisposableVisualizer" Path="|DisposableVisualizer|"/>
+    </Assets>
+    <Prerequisites>
+        <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[15.0,16.0)" DisplayName="Visual Studio core editor" />
+        <Prerequisite Id="Microsoft.VisualStudio.Component.Roslyn.LanguageServices" Version="[15.0,16.0)" DisplayName="Roslyn Language Services" />
+    </Prerequisites>
+</PackageManifest>
