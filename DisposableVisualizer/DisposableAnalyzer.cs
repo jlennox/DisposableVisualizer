@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -15,7 +16,7 @@ namespace Lennox.DisposableVisualizer
     public class DisposableAnalyzer : DiagnosticAnalyzer
     {
         internal static readonly DiagnosticDescriptor DisposableRule =
-            CreateDescriptor("JLD0001", "Disposable object being constructed.");
+            CreateDescriptor("JLD0001", "Disposable object constructed.");
 
         public override ImmutableArray<DiagnosticDescriptor>
             SupportedDiagnostics => ImmutableArray.Create(DisposableRule);
@@ -25,7 +26,9 @@ namespace Lennox.DisposableVisualizer
             SyntaxKind.ObjectCreationExpression,
             SyntaxKind.InvocationExpression,
             SyntaxKind.VariableDeclaration,
-            SyntaxKind.FieldDeclaration
+            SyntaxKind.FieldDeclaration,
+            SyntaxKind.UsingStatement,
+            SyntaxKind.ArgumentList
         };
 
         public override void Initialize(AnalysisContext context)
@@ -43,7 +46,8 @@ namespace Lennox.DisposableVisualizer
                     var type = context.SemanticModel.GetTypeInfo(
                         initializer, cancel);
 
-                    if (IsDisposable(type.Type))
+                    if (IsDisposable(type.Type) &&
+                        !IsChildOfUsing(context.Node))
                     {
                         Report(context);
                     }
@@ -54,7 +58,8 @@ namespace Lennox.DisposableVisualizer
                         .GetSymbolInfo(invoke, cancel).Symbol;
 
                     if (symbol is IMethodSymbol methodInfo &&
-                        IsDisposable(methodInfo.ReturnType))
+                        IsDisposable(methodInfo.ReturnType) &&
+                        !IsChildOfUsing(context.Node))
                     {
                         Report(context);
                     }
@@ -77,6 +82,24 @@ namespace Lennox.DisposableVisualizer
             }
         }
 
+        private static bool IsChildOfUsing(SyntaxNode node)
+        {
+            for (; node != null; node = node.Parent)
+            {
+                if (node is ArgumentListSyntax)
+                {
+                    return false;
+                }
+
+                if (node is UsingStatementSyntax)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static void Report(SyntaxNodeAnalysisContext context)
         {
             var diagnostic = Diagnostic.Create(
@@ -88,6 +111,24 @@ namespace Lennox.DisposableVisualizer
 
         private static bool IsDisposable(ITypeSymbol info)
         {
+            var infoNs = info.ContainingNamespace.ToString();
+
+            switch (infoNs)
+            {
+                case "System.IO":
+                    if (info.Name == "MemoryStream")
+                    {
+                        return false;
+                    }
+                    break;
+                case "System.Threading.Tasks":
+                    if (info.Name == "Task")
+                    {
+                        return false;
+                    }
+                    break;
+            }
+
             foreach (var i in info.AllInterfaces)
             {
                 if (i.SpecialType == SpecialType.System_IDisposable)
@@ -105,6 +146,66 @@ namespace Lennox.DisposableVisualizer
             return new DiagnosticDescriptor(
                 id, description, description,
                 "Performance", DiagnosticSeverity.Warning, true);
+        }
+
+        private static SyntaxKind[] DebugCreateAllSyntaxKinds()
+        {
+            const int low = 0x2000;
+            const int high = 0x22D9;
+
+            var all = new SyntaxKind[high - low + 1];
+            var index = 0;
+
+            for (var i = low; i <= high; ++i, index++)
+            {
+                all[index] = (SyntaxKind)i;
+            }
+
+            return all;
+        }
+
+        private static string DebugDumpTree(SyntaxNode rootNode)
+        {
+            var sb = new StringBuilder();
+
+            var toinspect = new Stack<Tuple<SyntaxNode, int>>();
+            toinspect.Push(new Tuple<SyntaxNode, int>(rootNode, 0));
+
+            while (toinspect.Count > 0)
+            {
+                var tuple = toinspect.Pop();
+                var node = tuple.Item1;
+                var depth = tuple.Item2;
+
+                sb.Append(' ', depth * 4);
+                sb.Append(node.GetType().Name);
+                sb.Append('\t');
+
+                var nodeString = node.ToString();
+
+                foreach (var chr in nodeString)
+                {
+                    switch (chr)
+                    {
+                        case '\n':
+                        case '\r':
+                            continue;
+                    }
+
+                    sb.Append(chr);
+                }
+
+                sb.Append('\n');
+
+                foreach (var kid in node.ChildNodes())
+                {
+                    toinspect.Push(new Tuple<SyntaxNode, int>(kid, depth + 1));
+                }
+            }
+
+            var description = sb.ToString();
+
+            return description;
         }
     }
 }
